@@ -7,10 +7,9 @@ import pdb
 
 if __name__=='__main__':
 
-    NumberOfSnapshotSubMatrices = 0
-    for path in pathlib.Path("./SubMatrices/").iterdir():
-        if path.is_file():
-            NumberOfSnapshotSubMatrices += 1
+    SingleSnapshots = np.load('Snapshots_Of_residuals.npy')
+    print(SingleSnapshots.shape)
+
 
     newpath = r'./NewlySplittedMatricesByElement'
 
@@ -18,25 +17,18 @@ if __name__=='__main__':
         os.makedirs(newpath)
     NumberOfPartitions = 10
 
+    partition_size = int(np.shape(SingleSnapshots)[0]/NumberOfPartitions)
     for j in range(NumberOfPartitions):
         SubMatrixBySnapshots_keep = None
-        for i in range(NumberOfSnapshotSubMatrices):
-            print(f'extracting matrix from sub-snapthot {i}')
-            SubMatrixBySnapshots_erase = np.load(f'./SubMatrices/SubSnapshot{i}.npy')
-            partition_size = int(np.shape(SubMatrixBySnapshots_erase)[0]/NumberOfPartitions)
+        print(f'extracting matrix from sub-snapthot {j}')
 
-            if j == NumberOfPartitions-1:
-                SubMatrixBySnapshots_erase = SubMatrixBySnapshots_erase[partition_size*j:,:]
-            else:
-                SubMatrixBySnapshots_erase = SubMatrixBySnapshots_erase[partition_size*j:partition_size*(j+1),:]
+        if j == NumberOfPartitions-1:
+            SAVE_IT = SingleSnapshots[partition_size*j:,:]
+        else:
+            SAVE_IT = SingleSnapshots[partition_size*j:partition_size*(j+1),:]
 
-            if SubMatrixBySnapshots_keep is None:
-                SubMatrixBySnapshots_keep = SubMatrixBySnapshots_erase
-            else:
-                SubMatrixBySnapshots_keep = np.c_[SubMatrixBySnapshots_keep, SubMatrixBySnapshots_erase]
-
-        np.save(f'./NewlySplittedMatricesByElement/PartitionedSubmatrix{j}',SubMatrixBySnapshots_keep)
-        print('the newly created matrix is of shape: ',np.shape(SubMatrixBySnapshots_keep))
+        np.save(f'./NewlySplittedMatricesByElement/PartitionedSubmatrix{j}',SAVE_IT)
+        print('the newly created matrix is of shape: ',np.shape(SAVE_IT))
 
 
 

@@ -3,6 +3,6 @@ from TrainHROM import TrainHROM
 from RunHROM import RunHROM
 
 if __name__=='__main__':
-    TrainROM(10)
+    TrainROM(1)
     TrainHROM()
     RunHROM()

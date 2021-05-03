@@ -3,8 +3,32 @@ from empirical_cubature_method import EmpiricalCubatureMethod
 import pdb
 
 if __name__== '__main__':
-    NumberOfSnapshotSubMatrices = 10
+
+
     ElementSelector = EmpiricalCubatureMethod()
+
+
+
+
+
+    #Single_application_of_ECM
+    kkk = np.load('Snapshots_Of_residuals.npy')
+    ElementSelector.SetUp(kkk, np.ones(np.shape(kkk)[0]))
+    ElementSelector.Initialize()
+    print('Computing ECM... \n')
+    ElementSelector.Calculate()
+    weights = np.squeeze(ElementSelector.w)
+    weights = np.reshape(weights,[np.size(weights),1])
+    elements = np.squeeze(ElementSelector.z)
+    Matrix_Single = kkk[elements,:]
+    Vector_Single = Matrix_Single.T @ weights
+    np.save('single_ECM_application.npy', Vector_Single)
+
+
+
+
+
+    NumberOfSnapshotSubMatrices = 10
     Matrix_Keep = None
     TotalElemsSubdomains = 0
     AddToElems = 0
@@ -89,7 +113,7 @@ if __name__== '__main__':
 
 
     OriginalNumberOfElements = 120950
-    ModelPartName = "3D_already_in_gid_coarse"
+    ModelPartName = "BarForClustering2"
     ElementSelector.WriteSelectedElements(ElementSelector.w, elements, OriginalNumberOfElements)
 
     #ElementSelector._CreateHyperReducedModelPart(ModelPartName)

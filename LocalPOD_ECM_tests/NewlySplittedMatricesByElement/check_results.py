@@ -18,10 +18,12 @@ if __name__=='__main__':
     Final_solution = matrix_of_selected_elements_FINAL.T @ global_weights_FINAL
 
 
+    single_ECM = np.load('single_ECM_application.npy')
+
     plt.plot(naive_solution, 'ro', lineWidth=3, label ='naive_solution')
     plt.plot(Final_solution,'bo' ,lineWidth=3, label ='Final_solution')
     plt.plot(sum_of_all_elemental_residuals,'k' ,lineWidth=3, label ='Exact Solution')
-
+    plt.plot(single_ECM,'go' ,lineWidth=3, label ='Single application')
 
 
     plt.legend()

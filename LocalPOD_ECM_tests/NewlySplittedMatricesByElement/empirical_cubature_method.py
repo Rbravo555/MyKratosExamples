@@ -1,7 +1,6 @@
 from KratosMultiphysics.RomApplication.element_selection_strategy import ElementSelectionStrategy
 from KratosMultiphysics.RomApplication.randomized_singular_value_decomposition import RandomizedSingularValueDecomposition
 import KratosMultiphysics
-import KratosMultiphysics.FluidDynamicsApplication
 
 import numpy as np
 import json
@@ -21,7 +20,7 @@ missing_matplotlib = True
 
 class EmpiricalCubatureMethod():
 
-    def __init__(self, ECM_tolerance = 1e-4, Filter_tolerance = 1e-16, Take_into_account_singular_values = False):
+    def __init__(self, ECM_tolerance = 1e-9, Filter_tolerance = 1e-16, Take_into_account_singular_values = False):
         self.ECM_tolerance = ECM_tolerance
         self.Filter_tolerance = Filter_tolerance
         self.Name = "EmpiricalCubature"
@@ -161,7 +160,7 @@ class EmpiricalCubatureMethod():
         return invH_new
 
     def _ObtainBasis(self,ResidualSnapshots):
-        u,s,_,_ = self.RSVDT_Object.Calculate(ResidualSnapshots, 1e-4)
+        u,s,_,_ = self.RSVDT_Object.Calculate(ResidualSnapshots, 1e-9)
         return u, s
 
 

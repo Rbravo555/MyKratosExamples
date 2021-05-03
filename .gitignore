@@ -1,2 +1,7 @@
 *.bin
 *.vtk
+*.npy
+RomParameters.json
+ElementsAndWeights.json
+*/__pycache__
+*.post.lst

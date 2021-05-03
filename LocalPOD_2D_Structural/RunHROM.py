@@ -4,7 +4,7 @@ from KratosMultiphysics.RomApplication.structural_mechanics_analysis_rom_LOCAL_P
 
 import json
 
-class RunHROM(StructuralMechanicsAnalysisROM):
+class HROM_simulation(StructuralMechanicsAnalysisROM):
 
     def ModifyInitialGeometry(self):
         """Here is the place where the BASIS_ROM and the AUX_ID are imposed to each node"""
@@ -18,10 +18,14 @@ class RunHROM(StructuralMechanicsAnalysisROM):
             for key in HR_data["Conditions"].keys():
                 computing_model_part.GetCondition(int(key)+1).SetValue(romapp.HROM_WEIGHT, HR_data["Conditions"][key])
 
-
-if __name__ == "__main__":
+def RunHROM():
     with open("ProjectParametersHROM.json",'r') as parameter_file:
         parameters = KratosMultiphysics.Parameters(parameter_file.read())
     model = KratosMultiphysics.Model()
-    simulation = RunHROM(model,parameters)
+    simulation = HROM_simulation(model,parameters)
     simulation.Run()
+
+
+if __name__ == "__main__":
+    RunHROM()
+

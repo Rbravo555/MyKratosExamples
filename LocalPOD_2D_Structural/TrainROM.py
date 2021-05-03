@@ -142,8 +142,7 @@ def convert_to_2d(SnapshotsMatrix, NumberOfDimensions=2):
     return columns_means
 
 
-
-if __name__ == "__main__":
+def TrainROM(Number_Of_Clusters=5):
     with open("ProjectParameters.json",'r') as parameter_file:
         parameters = KratosMultiphysics.Parameters(parameter_file.read())
 
@@ -165,7 +164,7 @@ if __name__ == "__main__":
     add_overlapping = False
 
     # #clustering
-    Number_Of_Clusters = 3
+    #Number_Of_Clusters =
     kmeans = KMeans(n_clusters=Number_Of_Clusters, random_state=0).fit(SnapshotMatrix.T)
 
     #split snapshots into sub-sets
@@ -345,3 +344,10 @@ if __name__ == "__main__":
     #     Delta_u = Bases[kmeans.labels_[i]]@ (Bases[kmeans.labels_[i]].T @ SnapshotMatrix[:,i])
 
     # Delta_q =  (Bases[kmeans.labels_[i]]).T @ Delta_u
+
+
+
+
+
+if __name__ == "__main__":
+    TrainROM()

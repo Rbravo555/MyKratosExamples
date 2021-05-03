@@ -1,7 +1,8 @@
 *.bin
 *.vtk
 *.npy
-RomParameters.json
-ElementsAndWeights.json
+**/RomParameters
+**/ElementsAndWeights
+**/Hyper_Reduced_Model_Part
 */__pycache__
 *.post.lst

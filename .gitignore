@@ -1,9 +1,10 @@
 *.bin
 *.vtk
 *.npy
+*.mat
 **/RomParameters*
 **/ElementsAndWeights*
 **/Hyper_Reduced_Model_Part*
-*/__pycache__
+**/__pycache__
 *.post.lst
 

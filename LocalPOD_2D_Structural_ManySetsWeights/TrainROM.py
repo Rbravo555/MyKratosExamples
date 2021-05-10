@@ -152,7 +152,7 @@ def TrainROM(Number_Of_Clusters=5):
     simulation.Run()
     end = time.time()
     print(end - start)
-    #pdb.set_trace()
+    pdb.set_trace()
     SnapshotMatrix = simulation.EvaluateQuantityOfInterest()
 
 
@@ -201,7 +201,7 @@ def TrainROM(Number_Of_Clusters=5):
         print('The error of representation basis ',i, 'using the basis ', 1, ' is ',   np.linalg.norm(      Bases[i] -  Bases[0]@Bases[0].T@Bases[i])  / np.linalg.norm(Bases[i]))
 
 
-    #pdb.set_trace()
+    pdb.set_trace()
 
     elements_to_print = [1]
     nodes_to_print = [2,4,1]
@@ -307,7 +307,7 @@ def TrainROM(Number_Of_Clusters=5):
 
 
 
-    #pdb.set_trace()
+    pdb.set_trace()
 
     current_cluster = []
     Delta_q = []

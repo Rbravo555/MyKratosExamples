@@ -10,11 +10,12 @@ import random
 from scipy.spatial import ConvexHull, convex_hull_plot_2d
 
 
-def AddOverlapping(SnapshotMatrix, sub_snapshots, kmeans, overlap_percentace=.2):
+def AddOverlapping(SnapshotMatrix, sub_snapshots, kmeans, overlap_percentace=.1):
     """
     This function could be implemented more efficently
     """
     Number_Of_Clusters = len(sub_snapshots)
+
     if Number_Of_Clusters!=1:
 
         neighbors={}
@@ -132,24 +133,28 @@ def plot_smallest_cluster_before_and_after_overlapping(sub_snapshots, sub_snapsh
     number_of_clusters =len(sub_snapshots)
 
     for i in range(number_of_clusters):
-        plt.scatter(sub_snapshots_with_overlapping[i][0,:],sub_snapshots_with_overlapping[i][1,:], c='red' )
-        plt.scatter(sub_snapshots[i][0,:],sub_snapshots[i][1,:], c=np.ones(sub_snapshots[i].shape[1]) * 50)
+        plt.scatter(sub_snapshots_with_overlapping[i][0,:],sub_snapshots_with_overlapping[i][1,:], c='red', label = 'overlapping' )
+        plt.scatter(sub_snapshots[i][0,:],sub_snapshots[i][1,:], c='green', label='original cluster')
+        plt.legend()
+        plt.xlim([-1, 1])
+        plt.ylim([-1,1])
         plt.show()
 
 
-
-
 if __name__ == '__main__':
-    x,y,g = get_gaussian( plot = False)
+    x,y,g = get_gaussian(random_samples = 20,  plot = False)
     SnapshotsMatrix = build_snapshots_from_3D_data(x,y,g)
     sub_snapshots, kmeans_object = clusterize(SnapshotsMatrix, 3)
-    sub_snapshots_with_overlapping = AddOverlapping(SnapshotsMatrix, sub_snapshots, kmeans_object)
-    # plot_convex_hulls(sub_snapshots_with_overlapping, x,y,g)
-    # simple_plot(sub_snapshots_with_overlapping)
+
+    #simple_plot(sub_snapshots)
+    #plot_convex_hulls(sub_snapshots, x,y,g)
+
+    sub_snapshots_with_overlapping = AddOverlapping(SnapshotsMatrix, sub_snapshots.copy(), kmeans_object)
+
+    #plot_convex_hulls(sub_snapshots_with_overlapping,x,y,g)
+    #simple_plot(sub_snapshots_with_overlapping)
+
     plot_smallest_cluster_before_and_after_overlapping(sub_snapshots, sub_snapshots_with_overlapping)
-
-
-WHY ARE OVERLAPPED AND NON-OVERLAPPED THE SAME????
 
 
 

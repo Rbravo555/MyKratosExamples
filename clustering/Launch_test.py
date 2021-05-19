@@ -274,15 +274,8 @@ def InterTrajectoryLocalSearch(Snapshots, number_of_trajectories):
             ordered_idx = np.argsort(distance_from_spap_j_to_snaps_from_traj_i)
             print(ordered_idx)
 
-
-
-
-
-
-
-
-
     return indCANDIDATES_self, indCANDIDATES_rest
+
 
 
 
@@ -290,75 +283,180 @@ def InterTrajectoryLocalSearch(Snapshots, number_of_trajectories):
 class TrainingSnapshots(object):
 
     def __init__(self):
-        self.Name = 'self expressive clustering'
+        self.Name = 'self expressive clustering + kmeans'
 
-    def GetDataAndTrajectory(self, Snapshots, trajectories):
+    def GetDataAndTrajectory(self, Snapshots, TrajectoryIndex, NumberOfTrajectories):
         self.Snapshots = Snapshots
-        self.Trajectory_index = trajectories
+        self.TrajectoryIndex = TrajectoryIndex
+        self.NumberOfTrajectories = NumberOfTrajectories
 
-    def GenerateDataAndTrajectory(self):
-        S = generating_trajectory_dependent_snapshot_2D(number_of_trajectories=10, samples_per_trajectory=10, plot=False) #last row defines trajectory
+    def GenerateDataAndTrajectory(self, NumberOfTrajectories=10, samples_per_trajectory=10 ):
+        S = generating_trajectory_dependent_snapshot_2D(NumberOfTrajectories, samples_per_trajectory, plot=False) #last row defines trajectory
         self.Snapshots = S[:-1,:]
-        self.Trajectory_index = S[-1,:]
+        self.TrajectoryIndex = S[-1,:]
+        self.LocalNeighbours = []
+        self.GlobalNeighbours = []
+        self.NumberOfTrajectories = NumberOfTrajectories
+        for i in range(np.size(self.TrajectoryIndex)):
+            self.LocalNeighbours.append([])
+            self.GlobalNeighbours.append([])
 
     def GetSnapshotsForAGivenTrajectory(self, trajectory):
-        points_in_trajectory = np.where(self.Trajectory_index == trajectory)[0]
-        return self.Snapshots[:,points_in_trajectory]
+        return self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)]
 
-    def GetIndexInAGivenTrajectory(self, trajectory):
-        points_in_trajectory = np.where(self.Trajectory_index == trajectory)[0]
+    def GetIndexInAGivenTrajectory(self,trajectory):
+        points_in_trajectory = np.where(self.TrajectoryIndex == trajectory)[0]
         return points_in_trajectory
 
+    def GetSnapshotsNotAGivenTrajectory(self, trajectory):
+        return self.Snapshots[:,self.GetIndexNotInAGivenTrajectory(trajectory)]
+
     def GetIndexNotInAGivenTrajectory(self, trajectory):
-        points_in_trajectory = np.where(self.Trajectory_index == trajectory)[0]
         total_number_of_snapshots = np.shape(self.Snapshots)[1]
         full_set_of_indices = np.linspace(0,total_number_of_snapshots-1,total_number_of_snapshots).astype(int)
         return np.setdiff1d(full_set_of_indices, self.GetIndexInAGivenTrajectory(trajectory))
 
-    def CreateClusters(self, number_of_clusters =3):
-        _,self.k_means_object = clusterize(self.Snapshots, number_of_clusters)
+    def GetKMeansClusters(self, number_of_clusters =3):
 
-    def FindSameTrajectoryNeighbours(self, trajectory):
+        self.NumberOfclusters = number_of_clusters
+        #TODO run this multiple times and keep the best clustering configuration...
+
+        self.KMeansObject = KMeans(n_clusters=self.NumberOfclusters, random_state=0).fit(self.Snapshots.T)
+        #split snapshots into sub-sets
+        self.sub_snapshots={}
+        for i in range(self.NumberOfclusters):
+            self.sub_snapshots[i] = self.Snapshots[:,self.KMeansObject.labels_==i] #we might not neet to save this, can slice it when calling the other function...
+
+        ##PLOTING FOR DEBUGGING
+        simple_plot(self.sub_snapshots)
+
+
+    def FindNeighboursForATrajectory(self, trajectory):
 
         this_trajectory_indices = self.GetIndexInAGivenTrajectory(trajectory)
-        this_trajectory_snapshots = self.GetSnapshotsForAGivenTrajectory(trajectory)
-        print(this_trajectory_snapshots)
-        plt.scatter(this_trajectory_snapshots[0,:],this_trajectory_snapshots[1,:] )
-        plt.show()
+        #self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)] = self.GetSnapshotsForAGivenTrajectory(trajectory)
         number_of_point_in_this_trajectory = np.size(this_trajectory_indices)
+
+        for j in range(number_of_point_in_this_trajectory): #loop over points in trajectory
+            distance_from_spap_j_to_snaps_from_this_trajectory  = np.zeros(number_of_point_in_this_trajectory)
+            for k in range(number_of_point_in_this_trajectory):
+                distance_from_spap_j_to_snaps_from_this_trajectory[k] = np.linalg.norm(self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j] - self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,k])
+            ordered_idx = np.argsort(distance_from_spap_j_to_snaps_from_this_trajectory)
+
+            #what if there is a tie ?  In case there is a tie, that is, a snapshot is repeated, then any repetition it will be a linear combination and
+            #it should be eliminated when doing the SVD afterwards, so it will not matter in the end...
+            error = 1
+            tolerance = 1e-4
+
+            #calculate the linear independence
+            index = 1
+            maximum_number_neighbours =11
+            norm_snap_j = np.linalg.norm(self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j])
+            while error > tolerance:
+                if index==1:
+                    local_neighbours = this_trajectory_indices[ordered_idx[index]]
+                else:
+                    local_neighbours = np.squeeze(np.c_[local_neighbours, this_trajectory_indices[ordered_idx[index]]])
+                Q,_ = np.linalg.qr(self.Snapshots[:,local_neighbours].reshape(np.shape(self.Snapshots)[0],-1)) # using numpy's QR for the orthogonal basis
+                if norm_snap_j > 0:   #TODO this should be avoided by creating a first cluster containing those snapshots with low norm
+                    error = np.linalg.norm(self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j] - Q@Q.T@self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j]) / norm_snap_j
+                else:
+                    error = np.linalg.norm(self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j] - Q@Q.T@self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j])
+
+                index+=1
+                if index>maximum_number_neighbours+1:
+                    raise Exception("Too many neighbours :(")
+
+
+            self.LocalNeighbours[this_trajectory_indices[j]] = local_neighbours
+
+
+        other_trajectory_indices = self.GetIndexNotInAGivenTrajectory(trajectory)
+        #self.Snapshots[:,self.GetIndexNotInAGivenTrajectory(trajectory)] = self.GetSnapshotsNotAGivenTrajectory(trajectory)
+        number_of_point_in_other_trajectories = np.size(other_trajectory_indices)
 
 
         for j in range(number_of_point_in_this_trajectory): #loop over points in trajectory
-
-            #distance_matrix = this_trajectory_snapshots - this_trajectory_snapshots[:,j].reshape(this_trajectory_snapshots.shape[0],1)
-            distance_from_spap_j_to_snaps_from_this_trajectory  = np.zeros(number_of_point_in_this_trajectory)
-            for k in range(number_of_point_in_this_trajectory):
-                distance_from_spap_j_to_snaps_from_this_trajectory[k] = np.linalg.norm(this_trajectory_snapshots[:,j] - this_trajectory_snapshots[:,k])
-            ordered_idx = np.argsort(distance_from_spap_j_to_snaps_from_this_trajectory)
-            print(ordered_idx)
-
-        #calculate the linear independence
-
-    def FindOtherTrajectoriesNeighbours(self, trajectory):
-        #similarly
-        pass
+            distance_from_spap_j_to_snaps_in_other_trajectories  = np.zeros(number_of_point_in_other_trajectories)
+            for k in range(number_of_point_in_other_trajectories):
+                distance_from_spap_j_to_snaps_in_other_trajectories[k] = np.linalg.norm(self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j] - self.Snapshots[:,self.GetIndexNotInAGivenTrajectory(trajectory)][:,k])
+            ordered_idx = np.argsort(distance_from_spap_j_to_snaps_in_other_trajectories)
 
 
+            #what if there is a tie ?  In case there is a tie, that is, a snapshot is repeated, then any repetition will be a linear combination and
+            #it should be eliminated when doing the SVD afterwards, so it will not matter in the end...
+            error = 1
+            tolerance = 1e-4
+
+            #calculate the linear independence
+            index = 1
+            maximum_number_neighbours = 11
+            norm_snap_j = np.linalg.norm(self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j])
+            while error > tolerance:
+                if index==1:
+                    global_neighbours = other_trajectory_indices[ordered_idx[index]]
+                else:
+                    global_neighbours = np.squeeze(np.c_[global_neighbours, other_trajectory_indices[ordered_idx[index]]])
+                Q,_ = np.linalg.qr(self.Snapshots[:,global_neighbours].reshape(np.shape(self.Snapshots)[0],-1)) # using numpy's QR for the orthogonal basis
+                if norm_snap_j > 0:   #TODO this should be avoided by creating a first cluster containing those snapshots with low norm
+                    error = np.linalg.norm(self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j] - Q@Q.T@self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j]) / norm_snap_j
+                else:
+                    error = np.linalg.norm(self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j] - Q@Q.T@self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j])
+
+                index+=1
+                if index>maximum_number_neighbours+1:
+                    raise Exception("Too many neighbours :(")
+            self.GlobalNeighbours[this_trajectory_indices[j]] = global_neighbours
 
 
+    def FindNeighbours(self):
+        print('\nFinding Neighbours ...\n')
+        for i in range(self.NumberOfTrajectories):
+            self.FindNeighboursForATrajectory(i)
 
 
+    def AddOverlapping(self):
+        self.OverlapAdded = True
+        # join k-means clusters and clusters neighbours
+        self.ClusterIndexesWithOverlapping = {}
+        for i in range(self.NumberOfclusters):
+            OriginalIndexes = np.where(self.KMeansObject.labels_==i)[0]
+            for j in range(np.size(OriginalIndexes)): #TODO do this more efficiently
+                if j==0:
+                    Neighbours = self.LocalNeighbours[OriginalIndexes[j]]
+                    Neighbours = np.squeeze(np.r_[Neighbours, self.GlobalNeighbours[OriginalIndexes[j]]])
+                else:
+                    Neighbours = np.squeeze(np.r_[Neighbours, self.LocalNeighbours[OriginalIndexes[j]]])
+                    Neighbours = np.squeeze(np.r_[Neighbours, self.GlobalNeighbours[OriginalIndexes[j]]])
+
+            self.ClusterIndexesWithOverlapping[i] = np.unique(np.squeeze(np.r_[OriginalIndexes, Neighbours ]))
 
 
 
 if __name__ == '__main__':
 
     Snaps = TrainingSnapshots()
-    Snaps.GenerateDataAndTrajectory()
+    Snaps.GenerateDataAndTrajectory(NumberOfTrajectories=10, samples_per_trajectory=10)
+    Snaps.FindNeighbours() #this is way too slow :(  optimize later, finish first implementation first...
+    number_of_clusters = 12
+    Snaps.GetKMeansClusters(number_of_clusters)
+    Snaps.AddOverlapping()
 
-    Snaps.CreateClusters()
-    #Snaps.FindNeighbours()#same trajectory and other trajectories
-    Snaps.FindSameTrajectoryNeighbours(2)
+    for i in range(number_of_clusters):
+        cluster_i_NO_overlapping = Snaps.Snapshots[:,Snaps.KMeansObject.labels_==i]
+        cluster_i_with_overlapping = Snaps.Snapshots[:,Snaps.ClusterIndexesWithOverlapping[i]]
+        plt.scatter(cluster_i_with_overlapping[0,:],cluster_i_with_overlapping[1,:], c='red', label = 'overlapping' )
+        plt.scatter(cluster_i_NO_overlapping[0,:],cluster_i_NO_overlapping[1,:], c='green', label='original cluster')
+        plt.legend()
+        plt.xlim([-1, 1])
+        plt.ylim([-1,1])
+        plt.show()
+
+
+
+
+
+
     #Snaps.FindOtherTrajectoriesNeighbours()
 
 

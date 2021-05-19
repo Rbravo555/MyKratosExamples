@@ -13,8 +13,6 @@ import skfuzzy as fuzz
 
 
 
-
-
 def AddOverlapping(SnapshotMatrix, sub_snapshots, kmeans, overlap_percentace=.2):
     """
     This function could be implemented more efficently
@@ -79,7 +77,7 @@ def clusterize(SnapshotMatrix, Number_Of_Clusters = 5):
     return sub_snapshots, kmeans
 
 
-def gaussians(x,y,sigma = 0.12, mu=0.4):
+def gaussians(x,y,sigma = 0.1, mu=0.3):
     g_1 = (1/ sigma**2 *2*np.pi) * np.exp(-( ((x+mu)**2 + (y+mu)**2) / ( 2.0 * sigma**2 ) ) )
     g_2 = (1/ sigma**2 *2*np.pi) * np.exp(-( ((x-mu)**2 + (y-mu)**2) / ( 2.0 * sigma**2 ) ) )
     g_3 = (1/ sigma**2 *2*np.pi) * np.exp(-( ((x+mu)**2 + (y-mu)**2) / ( 2.0 * sigma**2 ) ) )
@@ -88,9 +86,11 @@ def gaussians(x,y,sigma = 0.12, mu=0.4):
     return g
 
 
-def get_gaussian(random_samples = 20, plot = True):
-    x = (np.random.rand(random_samples,random_samples) -0.5) *2
-    y = (np.random.rand(random_samples,random_samples) -0.5) *2
+def get_gaussian(x = None, y = None, random_samples = 20, plot = True):
+    if x is None:
+        x = (np.random.rand(random_samples,random_samples) -0.5) *2
+    if y is None:
+        y = (np.random.rand(random_samples,random_samples) -0.5) *2
     g = gaussians(x,y)
 
     if plot:
@@ -207,7 +207,7 @@ def fuzzy_test():
     plt.show()
 
 
-def generating_trajectory_dependent_snapshot_2D(number_of_trajectories,samples_per_trajectory = 10, plot = True):
+def generating_trajectory_dependent_snapshot_2D(number_of_trajectories,samples_per_trajectory = 10, plot = False):
 
     # dummy dataset 1
     SnapshotWithTrajectoryInfo = np.zeros((3,number_of_trajectories*samples_per_trajectory))
@@ -289,14 +289,19 @@ class TrainingSnapshots(object):
         self.Snapshots = Snapshots
         self.TrajectoryIndex = TrajectoryIndex
         self.NumberOfTrajectories = NumberOfTrajectories
+        self.LocalNeighbours = []
+        self.GlobalNeighbours = []
+        for i in range(np.size(self.TrajectoryIndex)):
+            self.LocalNeighbours.append([])
+            self.GlobalNeighbours.append([])
 
     def GenerateDataAndTrajectory(self, NumberOfTrajectories=10, samples_per_trajectory=10 ):
         S = generating_trajectory_dependent_snapshot_2D(NumberOfTrajectories, samples_per_trajectory, plot=False) #last row defines trajectory
+        self.NumberOfTrajectories = NumberOfTrajectories
         self.Snapshots = S[:-1,:]
         self.TrajectoryIndex = S[-1,:]
         self.LocalNeighbours = []
         self.GlobalNeighbours = []
-        self.NumberOfTrajectories = NumberOfTrajectories
         for i in range(np.size(self.TrajectoryIndex)):
             self.LocalNeighbours.append([])
             self.GlobalNeighbours.append([])
@@ -327,8 +332,17 @@ class TrainingSnapshots(object):
         for i in range(self.NumberOfclusters):
             self.sub_snapshots[i] = self.Snapshots[:,self.KMeansObject.labels_==i] #we might not neet to save this, can slice it when calling the other function...
 
-        ##PLOTING FOR DEBUGGING
-        simple_plot(self.sub_snapshots)
+
+        for i in range(len(self.sub_snapshots)):
+            plt.scatter(self.sub_snapshots[i][0,:],self.sub_snapshots[i][1,:])
+
+        figManager = plt.get_current_fig_manager()
+        figManager.window.showMaximized()
+
+        plt.title('Original Clustering', fontsize=15, fontweight ='bold')
+        plt.show()
+
+
 
 
     def FindNeighboursForATrajectory(self, trajectory):
@@ -356,7 +370,7 @@ class TrainingSnapshots(object):
                 if index==1:
                     local_neighbours = this_trajectory_indices[ordered_idx[index]]
                 else:
-                    local_neighbours = np.squeeze(np.c_[local_neighbours, this_trajectory_indices[ordered_idx[index]]])
+                    local_neighbours = np.squeeze(np.r_[local_neighbours, this_trajectory_indices[ordered_idx[index]]])
                 Q,_ = np.linalg.qr(self.Snapshots[:,local_neighbours].reshape(np.shape(self.Snapshots)[0],-1)) # using numpy's QR for the orthogonal basis
                 if norm_snap_j > 0:   #TODO this should be avoided by creating a first cluster containing those snapshots with low norm
                     error = np.linalg.norm(self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j] - Q@Q.T@self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j]) / norm_snap_j
@@ -396,7 +410,7 @@ class TrainingSnapshots(object):
                 if index==1:
                     global_neighbours = other_trajectory_indices[ordered_idx[index]]
                 else:
-                    global_neighbours = np.squeeze(np.c_[global_neighbours, other_trajectory_indices[ordered_idx[index]]])
+                    global_neighbours = np.squeeze(np.r_[global_neighbours, other_trajectory_indices[ordered_idx[index]]])
                 Q,_ = np.linalg.qr(self.Snapshots[:,global_neighbours].reshape(np.shape(self.Snapshots)[0],-1)) # using numpy's QR for the orthogonal basis
                 if norm_snap_j > 0:   #TODO this should be avoided by creating a first cluster containing those snapshots with low norm
                     error = np.linalg.norm(self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j] - Q@Q.T@self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j]) / norm_snap_j
@@ -433,23 +447,59 @@ class TrainingSnapshots(object):
 
 
 
-if __name__ == '__main__':
+
+
+
+
+
+
+def compare_farhats_vs_ours(NumberOfTrajectories =  10, SamplesPerTrajectory = 10,  number_of_clusters = 12, FahatsOverlapPerencetage=.1 ):
+
+
+    S = generating_trajectory_dependent_snapshot_2D(NumberOfTrajectories, SamplesPerTrajectory, plot=False) #last row defines trajectory
+    Snapshots = S[:-1,:]
+    TrajectoryIndex = S[-1,:]
 
     Snaps = TrainingSnapshots()
-    Snaps.GenerateDataAndTrajectory(NumberOfTrajectories=10, samples_per_trajectory=10)
+    Snaps.GetDataAndTrajectory(Snapshots, TrajectoryIndex, NumberOfTrajectories)
     Snaps.FindNeighbours() #this is way too slow :(  optimize later, finish first implementation first...
-    number_of_clusters = 12
+
     Snaps.GetKMeansClusters(number_of_clusters)
     Snaps.AddOverlapping()
 
+
+
+    sub_snapshots, kmeans_object = clusterize(Snapshots, number_of_clusters)
+    sub_snapshots_with_overlapping = AddOverlapping(Snapshots, sub_snapshots.copy(), kmeans_object, overlap_percentace=FahatsOverlapPerencetage)
+
+    #plot side by side
+
+
     for i in range(number_of_clusters):
-        cluster_i_NO_overlapping = Snaps.Snapshots[:,Snaps.KMeansObject.labels_==i]
-        cluster_i_with_overlapping = Snaps.Snapshots[:,Snaps.ClusterIndexesWithOverlapping[i]]
-        plt.scatter(cluster_i_with_overlapping[0,:],cluster_i_with_overlapping[1,:], c='red', label = 'overlapping' )
-        plt.scatter(cluster_i_NO_overlapping[0,:],cluster_i_NO_overlapping[1,:], c='green', label='original cluster')
-        plt.legend()
+        #fig, axs = plt.subplots(2)
+        fig, (ax1, ax2) = plt.subplots(1, 2)
         plt.xlim([-1, 1])
         plt.ylim([-1,1])
+        fig.suptitle(f'Cluster {i}')
+        cluster_i_NO_overlapping = Snaps.Snapshots[:,Snaps.KMeansObject.labels_==i]
+        cluster_i_with_overlapping = Snaps.Snapshots[:,Snaps.ClusterIndexesWithOverlapping[i]]
+        ax1.set_title('Farhats', fontsize=15, fontweight ='bold')
+        ax1.scatter(sub_snapshots_with_overlapping[i][0,:],sub_snapshots_with_overlapping[i][1,:], c='red', label = 'overlapping' )
+        ax1.scatter(sub_snapshots[i][0,:],sub_snapshots[i][1,:], c='green', label='original cluster')
+        ax1.legend()
+        ax1.set_xlim([-1,1])
+        ax1.set_ylim([-1,1])
+
+        ax2.set_title('Ours', fontsize=15, fontweight ='bold')
+        ax2.scatter(cluster_i_with_overlapping[0,:],cluster_i_with_overlapping[1,:], c='red', label = 'overlapping' )
+        ax2.scatter(cluster_i_NO_overlapping[0,:],cluster_i_NO_overlapping[1,:], c='green', label='original cluster')
+        ax2.legend()
+        ax2.set_xlim([-1,1])
+        ax2.set_ylim([-1,1])
+
+        figManager = plt.get_current_fig_manager()
+        figManager.window.showMaximized()
+
         plt.show()
 
 
@@ -457,33 +507,93 @@ if __name__ == '__main__':
 
 
 
-    #Snaps.FindOtherTrajectoriesNeighbours()
+def compare_farhats_vs_ours2(NumberOfTrajectories =  10, SamplesPerTrajectory = 10,  number_of_clusters = 12, FahatsOverlapPerencetage=.1 ):
 
-
-    # a = np.array([1,2,3,5,7,8])
-    # b = np.array([8,3,6,7,12,6])
-    # c = np.r_[a,b,b,a,b]
-    # print('c is: ',c,' \nthe unique members in c are',np.unique(c))
-
-
-
-
-    # number_of_trajectories = 10
-    # samples_per_trajectory = 20
-    # S = generating_trajectory_dependent_snapshot_2D(number_of_trajectories, samples_per_trajectory, plot=False) #last row defines trajectory
-    # # S_without_trajectory = S[:2,:] # trim last row (trajectory)
-    # # sub_snapshots, kmeans_object = clusterize(S_without_trajectory, 8)
-    # # plot_clusterization(S_without_trajectory, kmeans_object)
-
-    # InterTrajectoryLocalSearch( S, number_of_trajectories)
+    S = generating_trajectory_dependent_snapshot_2D(NumberOfTrajectories, SamplesPerTrajectory, plot=False) #last row defines trajectory
+    CoodinatesSamplings = S[:-1,:]
+    Snapshots = build_snapshots_from_3D_data(CoodinatesSamplings[0,:],CoodinatesSamplings[1,:],gaussians(CoodinatesSamplings[0,:],CoodinatesSamplings[1,:]))
+    TrajectoryIndex = S[-1,:]
 
 
 
 
+    Snaps = TrainingSnapshots()
+    Snaps.GetDataAndTrajectory(Snapshots, TrajectoryIndex, NumberOfTrajectories)
+    Snaps.FindNeighbours() #this is way too slow :(  optimize later, finish first implementation first...
+
+    Snaps.GetKMeansClusters(number_of_clusters)
+    Snaps.AddOverlapping()
 
 
 
-    # x,y,g = get_gaussian(random_samples = 20,  plot = False)
+    sub_snapshots, kmeans_object = clusterize(Snapshots, number_of_clusters)
+    sub_snapshots_with_overlapping = AddOverlapping(Snapshots, sub_snapshots.copy(), kmeans_object, overlap_percentace=FahatsOverlapPerencetage)
+
+    #plot side by side
+
+
+    for i in range(number_of_clusters):
+        #fig, axs = plt.subplots(2)
+        fig, (ax1, ax2) = plt.subplots(1, 2)
+        plt.xlim([-1, 1])
+        plt.ylim([-1,1])
+
+        fig.suptitle(f'Cluster {i}')
+        cluster_i_NO_overlapping = Snaps.Snapshots[:,Snaps.KMeansObject.labels_==i]
+        cluster_i_with_overlapping = Snaps.Snapshots[:,Snaps.ClusterIndexesWithOverlapping[i]]
+        ax1.set_title('Farhats', fontsize=15, fontweight ='bold')
+
+        x, y = np.meshgrid(np.linspace(-1,1,200), np.linspace(-1,1,200))
+        g = gaussians(x,y)
+        ax1.pcolormesh(x, y, g, cmap='RdBu', vmin=np.min(g), vmax=np.max(g))
+        ax1.scatter(sub_snapshots_with_overlapping[i][0,:],sub_snapshots_with_overlapping[i][1,:], c='red', label = 'overlapping' )
+        ax1.scatter(sub_snapshots[i][0,:],sub_snapshots[i][1,:], c='green', label='original cluster')
+        ax1.legend()
+        ax1.set_xlim([-1,1])
+        ax1.set_ylim([-1,1])
+
+        ax2.set_title('Ours', fontsize=15, fontweight ='bold')
+        ax2.pcolormesh(x, y, g, cmap='RdBu', vmin=np.min(g), vmax=np.max(g))
+        ax2.scatter(cluster_i_with_overlapping[0,:],cluster_i_with_overlapping[1,:], c='red', label = 'overlapping' )
+        ax2.scatter(cluster_i_NO_overlapping[0,:],cluster_i_NO_overlapping[1,:], c='green', label='original cluster')
+        ax2.legend()
+        ax2.set_xlim([-1,1])
+        ax2.set_ylim([-1,1])
+
+        figManager = plt.get_current_fig_manager()
+        figManager.window.showMaximized()
+
+        plt.show()
+
+
+
+
+
+if __name__ == '__main__':
+
+
+    # #### Test 1 ### 2D
+    # NumberOfTrajectories =  15
+    # SamplesPerTrajectory = 20
+    # number_of_clusters = 15
+    # FahatsOverlapPerencetage=.1
+    # compare_farhats_vs_ours(NumberOfTrajectories,SamplesPerTrajectory,number_of_clusters,FahatsOverlapPerencetage)
+
+
+    ### Test 2 ### trajectories over a synthetic 2-manifold embedded in 3D space
+    NumberOfTrajectories =  8
+    SamplesPerTrajectory = 30
+    number_of_clusters = 8
+    FahatsOverlapPerencetage=.3
+    compare_farhats_vs_ours2(NumberOfTrajectories,SamplesPerTrajectory,number_of_clusters,FahatsOverlapPerencetage)
+
+
+
+
+
+
+
+    #x,y,g = get_gaussian(random_samples = 20,  plot = False)
     # SnapshotsMatrix = build_snapshots_from_3D_data(x,y,g)
 
     # #TODO run algorithm a number of times, and choose the best clustering...  (the one that minimizes some metric)

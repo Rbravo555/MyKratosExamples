@@ -345,7 +345,7 @@ class TrainingSnapshots(object):
 
 
 
-    def FindNeighboursForATrajectory(self, trajectory):
+    def FindNeighboursForATrajectory_notEfficient(self, trajectory):
 
         this_trajectory_indices = self.GetIndexInAGivenTrajectory(trajectory)
         #self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)] = self.GetSnapshotsForAGivenTrajectory(trajectory)
@@ -421,6 +421,22 @@ class TrainingSnapshots(object):
                 if index>maximum_number_neighbours+1:
                     raise Exception("Too many neighbours :(")
             self.GlobalNeighbours[this_trajectory_indices[j]] = global_neighbours
+
+
+    def FindNeighboursForATrajectory(self, trajectory):
+        self.DistanceMatrix[:,self.GetIndexInAGivenTrajectory(trajectory)]
+
+
+    def GetDistanceMatrix(self):
+        diff = self.Snapshots.reshape(self.Snapshots.shape[1], 1, self.Snapshots.shape[0]) - self.Snapshots.T
+        print(diff.shape)
+        distance = (diff**2).sum(2)
+        print(distance.shape)
+        i = np.arange(distance.shape[0])
+        distance[i,i]= np.inf
+        ordered_index = np.argsort(distance, point_index)
+
+
 
 
     def FindNeighbours(self):
@@ -519,6 +535,7 @@ def compare_farhats_vs_ours2(NumberOfTrajectories =  10, SamplesPerTrajectory = 
 
     Snaps = TrainingSnapshots()
     Snaps.GetDataAndTrajectory(Snapshots, TrajectoryIndex, NumberOfTrajectories)
+    Snaps.GetDistanceMatrix()
     Snaps.FindNeighbours() #this is way too slow :(  optimize later, finish first implementation first...
 
     Snaps.GetKMeansClusters(number_of_clusters)
@@ -581,9 +598,9 @@ if __name__ == '__main__':
 
 
     ### Test 2 ### trajectories over a synthetic 2-manifold embedded in 3D space
-    NumberOfTrajectories =  8
-    SamplesPerTrajectory = 30
-    number_of_clusters = 8
+    NumberOfTrajectories =  5
+    SamplesPerTrajectory = 5
+    number_of_clusters = 21
     FahatsOverlapPerencetage=.3
     compare_farhats_vs_ours2(NumberOfTrajectories,SamplesPerTrajectory,number_of_clusters,FahatsOverlapPerencetage)
 

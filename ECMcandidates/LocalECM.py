@@ -36,11 +36,11 @@ def local_ecm(number_bases, path_bases):
         for j in range(len(z_i[i])):
             index = np.where( z ==   z_i[i][j] )
             if np.array([0]) == index[0]:
-                WeightsMatrix[index[0] , i] = z_i[i][j]
+                WeightsMatrix[index[0] , i] = w_i[i][j]
             elif not index[0]:
                 pass
             else:
-                WeightsMatrix[index[0] , i] = z_i[i][j]
+                WeightsMatrix[index[0] , i] = w_i[i][j]
 
     #TODO save the element id's in a list with their corresponding weight
 

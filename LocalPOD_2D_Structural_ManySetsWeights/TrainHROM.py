@@ -1,6 +1,6 @@
 import KratosMultiphysics
 import KratosMultiphysics.RomApplication as romapp
-from KratosMultiphysics.RomApplication.structural_mechanics_analysis_rom_LOCAL_POD import StructuralMechanicsAnalysisROM
+from KratosMultiphysics.RomApplication.structural_mechanics_analysis_rom_LOCAL_POD_candidates import StructuralMechanicsAnalysisROM
 
 def TrainHROM():
     with open("ProjectParameters.json",'r') as parameter_file:

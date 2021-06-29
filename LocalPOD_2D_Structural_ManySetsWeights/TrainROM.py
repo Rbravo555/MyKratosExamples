@@ -48,7 +48,7 @@ def ismember(A, B):
     else:
         return [ np.sum(a == B) for a in A ]
 
-def AddOverlapping(SnapshotMatrix, sub_snapshots, Number_Of_Clusters, kmeans, overlap_percentace=.2):
+def AddOverlapping(SnapshotMatrix, sub_snapshots, Number_Of_Clusters, kmeans, overlap_percentace=0.1):
     """
     This function could be implemented more efficently
     """
@@ -142,22 +142,23 @@ def convert_to_2d(SnapshotsMatrix, NumberOfDimensions=2):
     return columns_means
 
 
-def TrainROM(Number_Of_Clusters=5):
-    with open("ProjectParameters.json",'r') as parameter_file:
-        parameters = KratosMultiphysics.Parameters(parameter_file.read())
+def TrainROM(Number_Of_Clusters=5, run_simulations = False):
+    if run_simulations:
+        with open("ProjectParameters.json",'r') as parameter_file:
+            parameters = KratosMultiphysics.Parameters(parameter_file.read())
 
-    model = KratosMultiphysics.Model()
-    simulation = StructuralMechanicsAnalysisSavingData(model,parameters)
-    start = time.time()
-    simulation.Run()
-    end = time.time()
-    print(end - start)
-    pdb.set_trace()
-    SnapshotMatrix = simulation.EvaluateQuantityOfInterest()
+        model = KratosMultiphysics.Model()
+        simulation = StructuralMechanicsAnalysisSavingData(model,parameters)
+        start = time.time()
+        simulation.Run()
+        end = time.time()
+        print(end - start)
 
+        SnapshotMatrix = simulation.EvaluateQuantityOfInterest()
+        np.save('SnapshotMatrix.npy', SnapshotMatrix)
+    else:
+        SnapshotMatrix = np.load('SnapshotMatrix.npy')
 
-    np.save('SnapshotMatrix.npy', SnapshotMatrix)
-    #SnapshotMatrix = np.load('SnapshotMatrix.npy')
     norm_all = np.linalg.norm(SnapshotMatrix, 'fro')
 
 
@@ -165,7 +166,7 @@ def TrainROM(Number_Of_Clusters=5):
 
     # #clustering
     #Number_Of_Clusters =
-    kmeans = KMeans(n_clusters=Number_Of_Clusters, random_state=0).fit(SnapshotMatrix.T)
+    kmeans = KMeans(n_clusters=Number_Of_Clusters).fit(SnapshotMatrix.T)
 
     #split snapshots into sub-sets
     sub_snapshots={}
@@ -186,10 +187,10 @@ def TrainROM(Number_Of_Clusters=5):
         tolerances.append(tolerance_i)
         print(tolerance_i)
         #Bases[i],s,_,_ = RandomizedSingularValueDecomposition().Calculate(sub_snapshots[i], 1e-4 * tolerance_i     )
-        #Bases[i],s,_,_ = RandomizedSingularValueDecomposition().Calculate(sub_snapshots[i], 1e-6  )
-        Bases[i],s,_= np.linalg.svd(sub_snapshots[i], full_matrices=False)
-        Bases[i] = Bases[i][:,:8]
-        s = s[:8]
+        Bases[i],s,_,_ = RandomizedSingularValueDecomposition().Calculate(sub_snapshots[i], 1e-6  )
+        #Bases[i],s,_= np.linalg.svd(sub_snapshots[i], full_matrices=False)
+        #Bases[i] = Bases[i][:,:8]
+        #s = s[:8]
         np.save(f'Bases_{i+1}.npy', Bases[i])
         #Bases[i] = np.load(f'Bases_{i+1}.npy')
         # print(Bases[i])
@@ -200,8 +201,6 @@ def TrainROM(Number_Of_Clusters=5):
     for i in range(Number_Of_Clusters):
         print('The error of representation basis ',i, 'using the basis ', 1, ' is ',   np.linalg.norm(      Bases[i] -  Bases[0]@Bases[0].T@Bases[i])  / np.linalg.norm(Bases[i]))
 
-
-    pdb.set_trace()
 
     elements_to_print = [1]
     nodes_to_print = [2,4,1]
@@ -226,11 +225,11 @@ def TrainROM(Number_Of_Clusters=5):
 
     #visualize clusterization in 2D
     two_d_snapthots = convert_to_2d(SnapshotMatrix)
-    plt.scatter(two_d_snapthots[0,:], two_d_snapthots[1,:], c=kmeans.labels_, s=50, cmap='viridis')
+    #plt.scatter(two_d_snapthots[0,:], two_d_snapthots[1,:], c=kmeans.labels_, s=50, cmap='viridis')
     centroids_to_plot = convert_to_2d((kmeans.cluster_centers_).T)
-    plt.scatter(centroids_to_plot[0,:], centroids_to_plot[1,:], c='black', s=200, alpha=0.5)
-    plt.title('clustering visualization')
-    plt.show()
+    #plt.scatter(centroids_to_plot[0,:], centroids_to_plot[1,:], c='black', s=200, alpha=0.5)
+    #plt.title('clustering visualization')
+    #plt.show()
 
     np.save('labels.npy', kmeans.labels_)
     np.save('centroids_to_plot.npy', centroids_to_plot)
@@ -306,9 +305,6 @@ def TrainROM(Number_Of_Clusters=5):
         print(distance_to_clusters.GetZMatrix())
 
 
-
-    pdb.set_trace()
-
     current_cluster = []
     Delta_q = []
     Z_matrix = []
@@ -347,7 +343,5 @@ def TrainROM(Number_Of_Clusters=5):
 
 
 
-
-
 if __name__ == "__main__":
-    TrainROM()
+    TrainROM(5)

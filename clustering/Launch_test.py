@@ -11,6 +11,7 @@ from scipy.spatial import ConvexHull, convex_hull_plot_2d
 
 import skfuzzy as fuzz
 
+import time
 
 
 def AddOverlapping(SnapshotMatrix, sub_snapshots, kmeans, overlap_percentace=.2):
@@ -356,7 +357,7 @@ class TrainingSnapshots(object):
             for k in range(number_of_point_in_this_trajectory):
                 distance_from_spap_j_to_snaps_from_this_trajectory[k] = np.linalg.norm(self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,j] - self.Snapshots[:,self.GetIndexInAGivenTrajectory(trajectory)][:,k])
             ordered_idx = np.argsort(distance_from_spap_j_to_snaps_from_this_trajectory)
-
+            #print(ordered_idx)
             #what if there is a tie ?  In case there is a tie, that is, a snapshot is repeated, then any repetition it will be a linear combination and
             #it should be eliminated when doing the SVD afterwards, so it will not matter in the end...
             error = 1
@@ -423,18 +424,93 @@ class TrainingSnapshots(object):
             self.GlobalNeighbours[this_trajectory_indices[j]] = global_neighbours
 
 
-    def FindNeighboursForATrajectory(self, trajectory):
-        self.DistanceMatrix[:,self.GetIndexInAGivenTrajectory(trajectory)]
+    # def FindNeighboursForATrajectory(self, trajectory):
+    #     self.DistanceMatrix[:,self.GetIndexInAGivenTrajectory(trajectory)]
 
 
     def GetDistanceMatrix(self):
-        diff = self.Snapshots.reshape(self.Snapshots.shape[1], 1, self.Snapshots.shape[0]) - self.Snapshots.T
-        print(diff.shape)
-        distance = (diff**2).sum(2)
-        print(distance.shape)
-        i = np.arange(distance.shape[0])
-        distance[i,i]= np.inf
-        ordered_index = np.argsort(distance, point_index)
+        #optimized solution using numpy's broadcasting
+        diff = self.Snapshots.reshape(self.Snapshots.shape[0], self.Snapshots.shape[1],1 ) - self.Snapshots.reshape(self.Snapshots.shape[0], 1, self.Snapshots.shape[1])
+        self.DistanceMatrix = (diff**2).sum(0)
+        # plt.spy(distance)
+        # plt.show()
+        #i = np.arange(distance.shape[0])
+        #distance[i,i]= np.inf
+        #plt.imshow(distance, cmap='hot')
+        #plt.show()
+        for trajectory in range(self.NumberOfTrajectories):
+            trajectory_indexes = self.GetIndexInAGivenTrajectory(trajectory)
+            other_trajectory_indexes = self.GetIndexNotInAGivenTrajectory(trajectory)
+            for j in range(np.size(trajectory_indexes)):
+                ordered_idx = np.argsort(self.DistanceMatrix[trajectory_indexes[j],trajectory_indexes])
+                #what if there is a tie ?  In case there is a tie, that is, a snapshot is repeated, then any repetition it will be a linear combination and
+                #it should be eliminated when doing the SVD afterwards, so it will not matter in the end...
+                error = 1
+                tolerance = 1e-4
+                #calculate the linear independence
+                index = 1
+                maximum_number_neighbours =11
+                snapshot_j = self.Snapshots[:,trajectory_indexes[j]]
+                norm_snapshot_j = np.linalg.norm(snapshot_j)
+                while error > tolerance:
+                    if index==1:
+                        local_neighbours = trajectory_indexes[ordered_idx[index]]
+                    else:
+                        local_neighbours = np.squeeze(np.r_[local_neighbours, trajectory_indexes[ordered_idx[index]]])
+                    Q,_ = np.linalg.qr(self.Snapshots[:,local_neighbours].reshape(np.shape(self.Snapshots)[0],-1)) # using numpy's QR for the orthogonal basis
+                    if norm_snapshot_j > 0:   #TODO this should be avoided by creating a first cluster containing those snapshots with low norm
+                        error = np.linalg.norm(snapshot_j - Q @ Q.T @ snapshot_j) / norm_snapshot_j
+                    else:
+                        error = np.linalg.norm(snapshot_j - Q @ Q.T @ snapshot_j)
+
+                    index+=1
+                    if index>maximum_number_neighbours+1:
+                        raise Exception("Too many neighbours :(")
+
+
+                self.LocalNeighbours[trajectory_indexes[j]] = local_neighbours
+
+            other_trajectory_indexes = self.GetIndexNotInAGivenTrajectory(trajectory)
+            for j in range(np.size(trajectory_indexes)):
+                ordered_idx = np.argsort(self.DistanceMatrix[trajectory_indexes[j],other_trajectory_indexes])
+                #what if there is a tie ?  In case there is a tie, that is, a snapshot is repeated, then any repetition will be a linear combination and
+                #it should be eliminated when doing the SVD afterwards, so it will not matter in the end...
+                error = 1
+                tolerance = 1e-4
+
+                #calculate the linear independence
+                index = 1
+                maximum_number_neighbours = 11
+                snapshot_j = self.Snapshots[:,trajectory_indexes[j]]
+                norm_snapshot_j = np.linalg.norm(snapshot_j)
+                while error > tolerance:
+                    if index==1:
+                        global_neighbours = other_trajectory_indexes[ordered_idx[index]]
+                    else:
+                        global_neighbours = np.squeeze(np.r_[global_neighbours, other_trajectory_indexes[ordered_idx[index]]])
+                    Q,_ = np.linalg.qr(self.Snapshots[:,global_neighbours].reshape(np.shape(self.Snapshots)[0],-1)) # using numpy's QR for the orthogonal basis
+                    if norm_snapshot_j > 0:   #TODO this should be avoided by creating a first cluster containing those snapshots with low norm
+                        error = np.linalg.norm(snapshot_j - Q @ Q.T @ snapshot_j) / norm_snapshot_j
+                    else:
+                        error = np.linalg.norm(snapshot_j - Q @ Q.T @ snapshot_j)
+
+                    index+=1
+                    if index>maximum_number_neighbours+1:
+                        raise Exception("Too many neighbours :(")
+                self.GlobalNeighbours[trajectory_indexes[j]] = global_neighbours
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -478,7 +554,16 @@ def compare_farhats_vs_ours(NumberOfTrajectories =  10, SamplesPerTrajectory = 1
 
     Snaps = TrainingSnapshots()
     Snaps.GetDataAndTrajectory(Snapshots, TrajectoryIndex, NumberOfTrajectories)
+    tic = time.perf_counter()
+    Snaps.GetDistanceMatrix()
+    toc = time.perf_counter()
+    print(f"New implementation {toc - tic:0.4f} seconds")
+
+    tic = time.perf_counter()
     Snaps.FindNeighbours() #this is way too slow :(  optimize later, finish first implementation first...
+    toc = time.perf_counter()
+    print(f"Old implementation {toc - tic:0.4f} seconds")
+
 
     Snaps.GetKMeansClusters(number_of_clusters)
     Snaps.AddOverlapping()
@@ -535,6 +620,7 @@ def compare_farhats_vs_ours2(NumberOfTrajectories =  10, SamplesPerTrajectory = 
 
     Snaps = TrainingSnapshots()
     Snaps.GetDataAndTrajectory(Snapshots, TrajectoryIndex, NumberOfTrajectories)
+
     Snaps.GetDistanceMatrix()
     Snaps.FindNeighbours() #this is way too slow :(  optimize later, finish first implementation first...
 
@@ -598,11 +684,11 @@ if __name__ == '__main__':
 
 
     ### Test 2 ### trajectories over a synthetic 2-manifold embedded in 3D space
-    NumberOfTrajectories =  5
-    SamplesPerTrajectory = 5
+    NumberOfTrajectories =  10
+    SamplesPerTrajectory = 200
     number_of_clusters = 21
     FahatsOverlapPerencetage=.3
-    compare_farhats_vs_ours2(NumberOfTrajectories,SamplesPerTrajectory,number_of_clusters,FahatsOverlapPerencetage)
+    compare_farhats_vs_ours(NumberOfTrajectories,SamplesPerTrajectory,number_of_clusters,FahatsOverlapPerencetage)
 
 
 
